@@ -5,11 +5,9 @@ import PouchAuth from 'pouchdb-authentication'
 import PouchdbFind from 'pouchdb-find'
 import RelationalPouch from 'relational-pouch'
 
-const memoryAdapter = require('pouchdb-adapter-memory')
-const search = require('pouchdb-quick-search')
+const search = require('pouchdb-quick-search/dist/pouchdb.quick-search')
 
 PouchDB.plugin(search)
-PouchDB.plugin(memoryAdapter)
 PouchDB.plugin(RelationalPouch)
 PouchDB.plugin(PouchdbFind)
 PouchDB.plugin(PouchAuth)
@@ -18,6 +16,9 @@ let serverDb
 let localDb
 
 if (process.env.NODE_ENV === 'test') {
+  const memoryAdapter = require('pouchdb-adapter-memory')
+
+  PouchDB.plugin(memoryAdapter)
   serverDb = new PouchDB('hospitalrun', { skip_setup: true, adapter: 'memory' })
   localDb = new PouchDB('local_hospitalrun', { skip_setup: true, adapter: 'memory' })
 } else {
