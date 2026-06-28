@@ -41,6 +41,16 @@ module.exports = {
     },
   },
   plugins: ['react', '@typescript-eslint', 'prettier', 'jest', 'import'],
+  overrides: [
+    {
+      files: ['*.ts', '*.tsx'],
+      rules: {
+        'global-require': 'off',
+        'no-shadow': 'off',
+        'no-use-before-define': 'off',
+      },
+    },
+  ],
   rules: {
     'prettier/prettier': 'error',
     '@typescript-eslint/member-delimiter-style': 'off',
