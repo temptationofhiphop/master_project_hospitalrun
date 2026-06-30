@@ -10,6 +10,7 @@ import usePatient from '../patients/hooks/usePatient'
 import TextFieldWithLabelFormGroup from '../shared/components/input/TextFieldWithLabelFormGroup'
 import useTranslator from '../shared/hooks/useTranslator'
 import Lab from '../shared/model/Lab'
+import Note from '../shared/model/Note'
 import Patient from '../shared/model/Patient'
 import Permissions from '../shared/model/Permissions'
 import { RootState } from '../shared/store'
@@ -22,6 +23,164 @@ import { LabError } from './utils/validate-lab'
 
 const getTitle = (patient: Patient | undefined, lab: Lab | undefined) =>
   patient && lab ? `${lab.type} for ${patient.fullName}(${lab.code})` : ''
+
+const formatLabDate = (date: string) => format(new Date(date), 'yyyy-MM-dd hh:mm a')
+
+const getBadgeColor = (status: Lab['status']) => {
+  if (status === 'completed') {
+    return 'primary'
+  }
+  if (status === 'canceled') {
+    return 'danger'
+  }
+  return 'warning'
+}
+
+type TranslationFunction = (key: string) => string
+
+type LabSummaryItemProps = {
+  className: string
+  label: string
+  value: React.ReactNode
+}
+
+const LabSummaryItem = ({ className, label, value }: LabSummaryItemProps) => (
+  <Column>
+    <div className={`form-group ${className}`}>
+      <h4>{label}</h4>
+      <h5>{value}</h5>
+    </div>
+  </Column>
+)
+
+type LabStatusProps = {
+  lab: Lab
+  t: TranslationFunction
+}
+
+const LabStatus = ({ lab, t }: LabStatusProps) => (
+  <Column>
+    <div className="form-group lab-status">
+      <h4>{t('labs.lab.status')}</h4>
+      <Badge color={getBadgeColor(lab.status)}>
+        <h5>{lab.status}</h5>
+      </Badge>
+    </div>
+  </Column>
+)
+
+const LabCompletedOrCanceledDate = ({ lab, t }: LabStatusProps) => {
+  if (lab.status === 'completed' && lab.completedOn) {
+    return (
+      <LabSummaryItem
+        className="completed-on"
+        label={t('labs.lab.completedOn')}
+        value={formatLabDate(lab.completedOn)}
+      />
+    )
+  }
+  if (lab.status === 'canceled' && lab.canceledOn) {
+    return (
+      <LabSummaryItem
+        className="canceled-on"
+        label={t('labs.lab.canceledOn')}
+        value={formatLabDate(lab.canceledOn)}
+      />
+    )
+  }
+  return null
+}
+
+type LabSummaryProps = {
+  lab: Lab
+  patient: Patient
+  t: TranslationFunction
+}
+
+const LabSummary = ({ lab, patient, t }: LabSummaryProps) => (
+  <Row>
+    <LabStatus lab={lab} t={t} />
+    <LabSummaryItem className="for-patient" label={t('labs.lab.for')} value={patient.fullName} />
+    <LabSummaryItem className="lab-type" label={t('labs.lab.type')} value={lab.type} />
+    <LabSummaryItem
+      className="requested-on"
+      label={t('labs.lab.requestedOn')}
+      value={formatLabDate(lab.requestedOn)}
+    />
+    <LabCompletedOrCanceledDate lab={lab} t={t} />
+  </Row>
+)
+
+type PastNotesProps = {
+  notes: Note[]
+  canDeleteNotes: boolean
+  onDeleteNote: (noteId: string) => Promise<void>
+}
+
+const PastNotes = ({ notes, canDeleteNotes, onDeleteNote }: PastNotesProps) => {
+  if (!notes.length) {
+    return null
+  }
+
+  return (
+    <>
+      {notes
+        .filter((note) => !note.deleted)
+        .map((note) => (
+          <Callout key={note.id} color="info">
+            <div className="d-flex justify-content-between">
+              <p data-testid="note">{note.text}</p>
+              {canDeleteNotes && (
+                <Button icon="remove" onClick={async () => onDeleteNote(note.id)} color="danger">
+                  <span data-testid={`delete-note-${note.id}`}>Delete</span>
+                </Button>
+              )}
+            </div>
+          </Callout>
+        ))}
+    </>
+  )
+}
+
+type LabActionButtonsProps = {
+  labStatus: Lab['status']
+  permissions: (Permissions | null)[]
+  onUpdate: () => Promise<void>
+  onComplete: () => Promise<void>
+  onCancel: () => Promise<void>
+  t: TranslationFunction
+}
+
+const LabActionButtons = ({
+  labStatus,
+  permissions,
+  onUpdate,
+  onComplete,
+  onCancel,
+  t,
+}: LabActionButtonsProps) => {
+  if (labStatus === 'completed' || labStatus === 'canceled') {
+    return null
+  }
+
+  return (
+    <>
+      <Button className="mr-2" color="success" onClick={onUpdate} key="actions.update">
+        {t('labs.requests.update')}
+      </Button>
+      {permissions.includes(Permissions.CompleteLab) && (
+        <Button className="mr-2" onClick={onComplete} color="primary" key="labs.requests.complete">
+          {t('labs.requests.complete')}
+        </Button>
+      )}
+      {permissions.includes(Permissions.CancelLab) && (
+        <Button onClick={onCancel} color="danger" key="labs.requests.cancel">
+          {t('labs.requests.cancel')}
+        </Button>
+      )}
+    </>
+  )
+}
 
 const ViewLab = () => {
   const { id } = useParams<{ id: string }>()
@@ -62,8 +221,9 @@ const ViewLab = () => {
 
   const onResultChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const result = event.currentTarget.value
-    const newLab = labToView as Lab
-    setLabToView({ ...newLab, result })
+    if (labToView) {
+      setLabToView({ ...labToView, result })
+    }
   }
 
   const onNotesChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -76,13 +236,9 @@ const ViewLab = () => {
       return
     }
 
-    const updatedNotes = labToView!.notes!.map((note) => {
-      if (note.id === noteIdToDelete) {
-        note.deleted = true
-      }
-
-      return note
-    })
+    const updatedNotes = labToView.notes.map((note) =>
+      note.id === noteIdToDelete ? { ...note, deleted: true } : note,
+    )
 
     const newLab = {
       ...labToView,
@@ -95,8 +251,7 @@ const ViewLab = () => {
 
   const onUpdate = async () => {
     if (labToView) {
-      const newLab = labToView as Lab
-
+      let newLab = labToView
       if (newNoteText) {
         const newNote = {
           id: uuid(),
@@ -105,7 +260,10 @@ const ViewLab = () => {
           deleted: false,
         }
 
-        newLab.notes = newLab.notes ? [...newLab.notes, newNote] : [newNote]
+        newLab = {
+          ...newLab,
+          notes: newLab.notes ? [...newLab.notes, newNote] : [newNote],
+        }
         setNewNoteText('')
       }
 
@@ -144,127 +302,13 @@ const ViewLab = () => {
     }
   }
 
-  const getButtons = () => {
-    const buttons: React.ReactNode[] = []
-    if (labToView?.status === 'completed' || labToView?.status === 'canceled') {
-      return buttons
-    }
-
-    buttons.push(
-      <Button className="mr-2" color="success" onClick={onUpdate} key="actions.update">
-        {t('labs.requests.update')}
-      </Button>,
-    )
-
-    if (permissions.includes(Permissions.CompleteLab)) {
-      buttons.push(
-        <Button className="mr-2" onClick={onComplete} color="primary" key="labs.requests.complete">
-          {t('labs.requests.complete')}
-        </Button>,
-      )
-    }
-
-    if (permissions.includes(Permissions.CancelLab)) {
-      buttons.push(
-        <Button onClick={onCancel} color="danger" key="labs.requests.cancel">
-          {t('labs.requests.cancel')}
-        </Button>,
-      )
-    }
-
-    return buttons
-  }
-
   if (labToView && patient) {
-    const getBadgeColor = () => {
-      if (labToView.status === 'completed') {
-        return 'primary'
-      }
-      if (labToView.status === 'canceled') {
-        return 'danger'
-      }
-      return 'warning'
-    }
-
-    const getCanceledOnOrCompletedOnDate = () => {
-      if (labToView.status === 'completed' && labToView.completedOn) {
-        return (
-          <Column>
-            <div className="form-group completed-on">
-              <h4>{t('labs.lab.completedOn')}</h4>
-              <h5>{format(new Date(labToView.completedOn), 'yyyy-MM-dd hh:mm a')}</h5>
-            </div>
-          </Column>
-        )
-      }
-      if (labToView.status === 'canceled' && labToView.canceledOn) {
-        return (
-          <Column>
-            <div className="form-group canceled-on">
-              <h4>{t('labs.lab.canceledOn')}</h4>
-              <h5>{format(new Date(labToView.canceledOn), 'yyyy-MM-dd hh:mm a')}</h5>
-            </div>
-          </Column>
-        )
-      }
-      return <></>
-    }
-
-    const getPastNotes = () => {
-      if (labToView?.notes?.length && labToView.notes.length > 0) {
-        return labToView.notes
-          .filter((note) => !note.deleted)
-          .map((note) => (
-            <Callout key={note.id} color="info">
-              <div className="d-flex justify-content-between">
-                <p data-testid="note">{note.text}</p>
-                {labToView.status === 'requested' && (
-                  <Button icon="remove" onClick={async () => deleteNote(note.id)} color="danger">
-                    <span data-testid={`delete-note-${note.id}`}>Delete</span>
-                  </Button>
-                )}
-              </div>
-            </Callout>
-          ))
-      }
-
-      return <></>
-    }
-
     return (
       <>
         {error && (
           <Alert color="danger" title={t('states.error')} message={t(error.message || '')} />
         )}
-        <Row>
-          <Column>
-            <div className="form-group lab-status">
-              <h4>{t('labs.lab.status')}</h4>
-              <Badge color={getBadgeColor()}>
-                <h5>{labToView.status}</h5>
-              </Badge>
-            </div>
-          </Column>
-          <Column>
-            <div className="form-group for-patient">
-              <h4>{t('labs.lab.for')}</h4>
-              <h5>{patient.fullName}</h5>
-            </div>
-          </Column>
-          <Column>
-            <div className="form-group lab-type">
-              <h4>{t('labs.lab.type')}</h4>
-              <h5>{labToView.type}</h5>
-            </div>
-          </Column>
-          <Column>
-            <div className="form-group requested-on">
-              <h4>{t('labs.lab.requestedOn')}</h4>
-              <h5>{format(new Date(labToView.requestedOn), 'yyyy-MM-dd hh:mm a')}</h5>
-            </div>
-          </Column>
-          {getCanceledOnOrCompletedOnDate()}
-        </Row>
+        <LabSummary lab={labToView} patient={patient} t={t} />
         <div className="border-bottom" />
         <form>
           <TextFieldWithLabelFormGroup
@@ -277,7 +321,11 @@ const ViewLab = () => {
             onChange={onResultChange}
           />
           <Label text={t('labs.lab.notes')} htmlFor="notesTextField" />
-          {getPastNotes()}
+          <PastNotes
+            notes={labToView.notes || []}
+            canDeleteNotes={labToView.status === 'requested'}
+            onDeleteNote={deleteNote}
+          />
           {isEditable && (
             <TextFieldWithLabelFormGroup
               name="notes"
@@ -288,7 +336,16 @@ const ViewLab = () => {
           )}
           {isEditable && (
             <div className="row float-right">
-              <div className="btn-group btn-group-lg mt-3 mr-3">{getButtons()}</div>
+              <div className="btn-group btn-group-lg mt-3 mr-3">
+                <LabActionButtons
+                  labStatus={labToView.status}
+                  permissions={permissions}
+                  onUpdate={onUpdate}
+                  onComplete={onComplete}
+                  onCancel={onCancel}
+                  t={t}
+                />
+              </div>
             </div>
           )}
         </form>
