@@ -1,7 +1,7 @@
 import { Button, Column, Row, Spinner } from '@hospitalrun/components'
 import format from 'date-fns/format'
 import React from 'react'
-import { useHistory } from 'react-router'
+import { useHistory } from 'react-router-dom'
 
 import usePatient from '../../patients/hooks/usePatient'
 import TextFieldWithLabelFormGroup from '../../shared/components/input/TextFieldWithLabelFormGroup'
