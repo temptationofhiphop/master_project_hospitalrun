@@ -21,6 +21,30 @@ import Visit from '../../../shared/model/Visit'
 import { RootState } from '../../../shared/store'
 import { expectOneConsoleError } from '../../test-utils/console.utils'
 
+jest.mock('@ckeditor/ckeditor5-build-classic', () => ({}))
+jest.mock('@ckeditor/ckeditor5-react', () => ({
+  CKEditor: ({
+    data,
+    onChange,
+  }: {
+    data: string
+    onChange: (
+      event: unknown,
+      editor: {
+        getData: () => string
+      },
+    ) => void
+  }) => {
+    const ReactForMock = jest.requireActual<typeof import('react')>('react')
+    return ReactForMock.createElement('textarea', {
+      'aria-label': 'labs.lab.notes',
+      value: data,
+      onChange: (event: { currentTarget: { value: string } }) =>
+        onChange({}, { getData: () => event.currentTarget.value }),
+    })
+  },
+}))
+
 const mockStore = createMockStore<RootState, any>([thunk])
 
 const setup = (

@@ -1,3 +1,5 @@
+import ClassicEditor from '@ckeditor/ckeditor5-build-classic'
+import { CKEditor } from '@ckeditor/ckeditor5-react'
 import {
   Select,
   Typeahead,
@@ -16,7 +18,6 @@ import { useHistory } from 'react-router-dom'
 import useAddBreadcrumbs from '../../page-header/breadcrumbs/useAddBreadcrumbs'
 import { useUpdateTitle } from '../../page-header/title/TitleContext'
 import { SelectOption } from '../../shared/components/input/SelectOption'
-import TextFieldWithLabelFormGroup from '../../shared/components/input/TextFieldWithLabelFormGroup'
 import TextInputWithLabelFormGroup from '../../shared/components/input/TextInputWithLabelFormGroup'
 import PatientRepository from '../../shared/db/PatientRepository'
 import useTranslator from '../../shared/hooks/useTranslator'
@@ -89,8 +90,7 @@ const NewLabRequest = () => {
     }))
   }
 
-  const onNoteChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const noteText = event.currentTarget.value
+  const onNoteChange = (noteText: string) => {
     setNewNoteText(noteText)
 
     const newNote: Note = {
@@ -187,13 +187,16 @@ const NewLabRequest = () => {
           onChange={onLabTypeChange}
         />
         <div className="form-group">
-          <TextFieldWithLabelFormGroup
-            name="labNotes"
-            label={t('labs.lab.notes')}
-            isEditable
-            value={newNoteText}
-            onChange={onNoteChange}
-          />
+          <Label text={t('labs.lab.notes')} htmlFor="labNotesEditor" />
+          <div id="labNotesEditor">
+            <CKEditor
+              editor={ClassicEditor}
+              data={newNoteText}
+              onChange={(_event, editor) => {
+                onNoteChange(editor.getData())
+              }}
+            />
+          </div>
         </div>
         <div className="row float-right">
           <div className="btn-group btn-group-lg mt-3 mr-3">

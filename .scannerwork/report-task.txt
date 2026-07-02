@@ -2,5 +2,5 @@ projectKey=Hospital-Frontend
 serverUrl=http://localhost:9000
 serverVersion=26.6.0.123539
 dashboardUrl=http://localhost:9000/dashboard?id=Hospital-Frontend
-ceTaskId=d1a0f2a9-8edd-44b1-9634-2f79c3639153
-ceTaskUrl=http://localhost:9000/api/ce/task?id=d1a0f2a9-8edd-44b1-9634-2f79c3639153
+ceTaskId=7d567c20-70ff-4146-bae8-8c0c98ec4c48
+ceTaskUrl=http://localhost:9000/api/ce/task?id=7d567c20-70ff-4146-bae8-8c0c98ec4c48

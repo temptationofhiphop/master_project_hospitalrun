@@ -5,6 +5,8 @@
   "private": false,
   "license": "MIT",
   "dependencies": {
+    "@ckeditor/ckeditor5-build-classic": "~36.0.1",
+    "@ckeditor/ckeditor5-react": "~5.1.0",
     "@hospitalrun/components": "~3.4.0",
     "@reduxjs/toolkit": "~1.7.0",
     "@types/escape-string-regexp": "~2.0.1",
